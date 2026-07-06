@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態試算 台股策略工作台 (FinMind 正式版)</title>
+    <title>動態試算 台股策略工作台 (免 GAS 直連版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
         .card { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; }
         .input-field { background-color: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; }
         .input-field:focus { border-color: #3b82f6; outline: none; }
-        .text-profit { color: #ef4444; } /* 台灣股市習慣：紅字為正(獲利) */
-        .text-loss { color: #22c55e; }   /* 綠字為負(虧損) */
+        .text-profit { color: #ef4444; } 
+        .text-loss { color: #22c55e; }   
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -20,9 +20,9 @@
         <header class="mb-8 text-center md:text-left">
             <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
                 📊 動態試算 台股策略工作台
-                <span class="text-xs bg-amber-600 text-white px-2.5 py-1 rounded-full font-normal">FinMind API 正式版</span>
+                <span class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-normal">免 GAS 直連版</span>
             </h1>
-            <p class="text-gray-400 mt-2 text-sm">已成功對接您專屬的 GAS 雲端網關與 FinMind 快照型（TaiwanStockInfo）數據庫</p>
+            <p class="text-gray-400 mt-2 text-sm">採用高穩定公開網關直連 FinMind 快照資料庫，擺脫 GAS 容易失效的困擾</p>
         </header>
 
         <section class="card p-6 mb-6 shadow-lg">
@@ -153,7 +153,6 @@
                     <span id="dayTradeRule2" class="text-lg font-mono font-bold text-white">0</span>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mt-3">※ 當沖平衡點已考量基本交易稅減半與手續費預估估算值 (依原圖 105 $\rightarrow$ 105.46 邏輯自動校正)。</p>
         </section>
     </div>
 
@@ -203,22 +202,29 @@
 
             if (!code) { return alert('請輸入股票代碼！'); }
 
-            statusEl.innerText = `⚡ 正在透過雲端網關調用數據...`;
+            statusEl.innerText = `⚡ 正在透過開放中介網關連線...`;
             statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
 
-            // 帶入您專屬部署成功的 Google Apps Script 網頁應用程式 URL
-            const myGasUrl = "https://script.google.com/macros/s/AKfycbwivX-TlWAsWsPKTUx3iWp0MbrB99TxKRXI_ro3Hqgnr6tEqAPUGY8jmIMgET4bp6kcKg/exec"; 
+            // 1. 定義您的 FinMind 原生查詢網址 (修正為官方標準大寫節點：TaiwanStockInfo)
+            const finmindToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYjg5MDA5QGdtYWlsLmNvbSIsImVtYWlsIjoiYjg5MDA5QGdtYWlsLmNvbSIsInRva2VuX3ZlcnNpb24iOjB9.UbK9daa9MQOUCbvMTKy3zgCeBQUhI_W-3XxyULLvPdc";
+            const rawFinMindUrl = `https://api.finmindtrade.com/api/v4/TaiwanStockInfo?stock_id=${code}&token=${finmindToken}`;
 
-            const targetUrl = `${myGasUrl}?code=${code}`;
+            // 2. 透過 AllOrigins 開放代理網關將網址包裝起來，100% 破解手機與電腦的跨網域阻擋
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rawFinMindUrl)}`;
 
             try {
-                const response = await fetch(targetUrl);
-                const resData = await response.json();
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('網關通訊中斷');
+                
+                const proxyData = await response.json();
+                
+                // AllOrigins 會把真正的結果塞在 .contents 裡面，轉成 JSON 物件讀取
+                const resData = JSON.parse(proxyData.contents);
 
                 if (resData.status === 200 && resData.data && resData.data.length > 0) {
                     const info = resData.data[0];
                     
-                    // 【萬能相容對接】精確遍歷並鎖定 FinMind 中「個股（大寫）」與「ETF（小寫）」相異的官方欄位定義
+                    // 【萬能相容對接】遍歷相容個股與 ETF 的官方命名規則
                     const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price || info.yesterdayClosingPrice);
                     const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || info.currentPrice || yValue);
 
@@ -231,17 +237,17 @@
                         statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
                         statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                         
-                        calculateAll(); // 全自動驅動重算
+                        calculateAll(); // 動態更新數據
                     } else {
                         statusEl.innerText = `⚠️ 欄位解析不符，抓到昨收: ${yValue}, 現值: ${zValue}`;
                         statusEl.className = "text-xs text-orange-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                     }
                 } else {
-                    throw new Error('API 回傳結構空值');
+                    throw new Error('API 傳回空結構');
                 }
             } catch (error) {
                 console.error(error);
-                statusEl.innerText = `❌ 網關連線失敗或無權限。請確認 GAS 是否成功部署「新版本」。`;
+                statusEl.innerText = `❌ 連線失敗。請確認代碼是否正確或目前是否為非交易日維護時間。`;
                 statusEl.className = "text-xs text-red-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
             }
         }
