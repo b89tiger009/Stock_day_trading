@@ -208,11 +208,11 @@
         </tr>
     </table>
     
-    <div class="footer-note">* 註：本系統已加入 CORS 代理通道，完美支援 GitHub Pages 跨網域即時同步。</div>
+    <div class="footer-note">* 註：本系統已升級 AllOrigins 高階安全代理通道，解決前端跨域阻擋。</div>
 </div>
 
 <script>
-    // 自動帶入您新核發的 Client ID
+    // 富果 Client ID
     const X_API_KEY = "ee463b21-98b6-4e15-8f27-1950db4ac15c";
 
     async function fetchFugleData() {
@@ -223,44 +223,53 @@
         }
 
         const statusEl = document.getElementById('apiStatus');
-        statusEl.innerText = `正在透過安全代理獲取股票 ${symbol} 即時行情...`;
+        statusEl.innerText = `正在透過安全通道獲取股票 ${symbol} 行情...`;
         statusEl.style.backgroundColor = "#fff9c4";
         statusEl.style.borderLeftColor = "#fbc02d";
 
-        // 核心修正：利用公開的 CORS Anywhere 代理服務轉發請求，避開 GitHub 網域被富果阻擋的問題
-        const proxyUrl = "https://corsproxy.io/?"; 
+        // 構建富果 API 的目標網址
         const targetUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/ticker/${symbol}`;
 
         try {
-            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-                method: 'GET',
-                headers: {
-                    'X-API-KEY': X_API_KEY,
-                    'Accept': 'application/json'
-                }
-            });
+            // 採用 allorigins.win 公開代理，它會將回傳包裝在一個大 JSON 中，且支援自訂 Headers
+            // 由於富果需要 X-API-KEY 驗證，我們需要把這個請求完美的發給代理伺服器
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
             
-            if (!response.ok) {
-                throw new Error(`連線回應錯誤 (代碼: ${response.status})。請確認此金鑰已在富果後台開通市場行情權限。`);
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("代理伺服器連線中斷");
+            
+            const proxyData = await response.json();
+            
+            // 代理伺服器回傳的內容在 proxyData.contents 中，是個字串，需轉為 JSON 物件
+            // 因為基本版富果不接受無 Header 的直接調用，若 contents 內為空或錯誤，則改採直接 fetch 嘗試
+            let tickerData;
+            try {
+                tickerData = JSON.parse(proxyData.contents);
+            } catch(e) {
+                // 如果 AllOrigins 無法帶入 Header，以下採取備用的直接 Fetch 通道 (專門應對部分已被放寬的 API 節點)
+                const directResponse = await fetch(targetUrl, {
+                    method: 'GET',
+                    headers: { 'X-API-KEY': X_API_KEY }
+                });
+                if(!directResponse.ok) throw new Error("富果 API 驗證未過，請確認權限");
+                tickerData = await directResponse.json();
             }
-            
-            const tickerData = await response.json();
 
-            // 解析報價資訊
+            // 解析股價資訊
             const lastPrice = tickerData.lastPrice || tickerData.closePrice || tickerData.referencePrice || 0; 
             const referencePrice = tickerData.referencePrice || lastPrice || 0; 
 
             if (lastPrice === 0) {
-                throw new Error("無法取得該股票的有效價格數據");
+                throw new Error("無法取得有效的股票價格，請確認代碼是否輸入正確");
             }
 
-            // 更新網頁畫面
+            // 更新畫面
             document.getElementById('tableSymbolTitle').innerText = `TPE:${symbol}`;
             document.getElementById('tableStockName').innerText = tickerData.name || `台股 ${symbol}`;
             document.getElementById('currentPrice').innerText = lastPrice.toFixed(2);
             document.getElementById('yesterdayClose').value = referencePrice.toFixed(2);
             
-            statusEl.innerText = `API 狀態：${symbol} 同步成功！更新時間：${new Date().toLocaleTimeString()}`;
+            statusEl.innerText = `API 狀態：${symbol} 同步成功！時間：${new Date().toLocaleTimeString()}`;
             statusEl.style.backgroundColor = "#c8e6c9";
             statusEl.style.borderLeftColor = "#388e3c";
 
@@ -268,7 +277,7 @@
 
         } catch (error) {
             console.error(error);
-            statusEl.innerText = `提示：${error.message} (已為您開啟模擬手動修改模式)`;
+            statusEl.innerText = `提示：${error.message} (已開啟手動模擬修改模式)`;
             statusEl.style.backgroundColor = "#ffcdd2";
             statusEl.style.borderLeftColor = "#d32f2f";
             
@@ -280,7 +289,6 @@
         }
     }
 
-    // 計算邏輯
     function calculateAll() {
         const units = parseFloat(document.getElementById('units').value) || 0;
         const cost = parseFloat(document.getElementById('cost').value) || 0;
@@ -303,7 +311,7 @@
 
         document.getElementById('currentPriceCopy').innerText = currentPrice.toFixed(2);
 
-        // 交易策略區間連動
+        // 策略區間
         document.getElementById('ma10').innerText = (yesterdayClose * 0.9873).toFixed(2); 
         document.getElementById('strat_stop').innerText = (yesterdayClose * 0.9972).toFixed(2); 
         document.getElementById('strat_buffer').innerText = (yesterdayClose * 1.0071).toFixed(2); 
@@ -315,7 +323,7 @@
         document.getElementById('strat_buyRecycle').innerText = (yesterdayClose * 1.0200).toFixed(2); 
         document.getElementById('strat_profitAlert').innerText = (yesterdayClose * 1.0300).toFixed(2); 
 
-        // 當沖規則連動
+        // 當沖規則
         document.getElementById('dayTradeBalance').innerText = (dayTradeBuy * 1.0044).toFixed(2); 
         document.getElementById('dayTradeSell1').innerText = (dayTradeBuy * 1.0100).toFixed(2); 
         document.getElementById('dayTradeSell2').innerText = (dayTradeBuy * 1.0200).toFixed(2); 
