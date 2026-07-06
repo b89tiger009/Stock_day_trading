@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態試算 台股策略工作台</title>
+    <title>動態試算 台股策略工作台 (FinMind 正式版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
@@ -20,9 +20,9 @@
         <header class="mb-8 text-center md:text-left">
             <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
                 📊 動態試算 台股策略工作台
-                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 精準連動版</span>
+                <span class="text-xs bg-amber-600 text-white px-2.5 py-1 rounded-full font-normal">FinMind API 正式版</span>
             </h1>
-            <p class="text-gray-400 mt-2 text-sm">採用您專屬的 Google Apps Script 雲端網關直連 FinMind 快照型數據庫</p>
+            <p class="text-gray-400 mt-2 text-sm">已成功對接您專屬的 GAS 雲端網關與 FinMind 快照型（TaiwanStockInfo）數據庫</p>
         </header>
 
         <section class="card p-6 mb-6 shadow-lg">
@@ -218,7 +218,7 @@
                 if (resData.status === 200 && resData.data && resData.data.length > 0) {
                     const info = resData.data[0];
                     
-                    // 【萬能欄位解碼機制】遍歷並相容 FinMind 中個股 (大寫) 與 ETF (小寫) 的命名規則差異
+                    // 【萬能相容對接】精確遍歷並鎖定 FinMind 中「個股（大寫）」與「ETF（小寫）」相異的官方欄位定義
                     const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price || info.yesterdayClosingPrice);
                     const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || info.currentPrice || yValue);
 
@@ -231,7 +231,7 @@
                         statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
                         statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                         
-                        calculateAll(); // 自動刷新計算
+                        calculateAll(); // 全自動驅動重算
                     } else {
                         statusEl.innerText = `⚠️ 欄位解析不符，抓到昨收: ${yValue}, 現值: ${zValue}`;
                         statusEl.className = "text-xs text-orange-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
