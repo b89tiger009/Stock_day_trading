@@ -3,334 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態試算台股個股盤控版</title>
+    <title>動態試算 台股策略工具 (GAS 快照精準版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: "Microsoft JhengHei", Arial, sans-serif;
-            background-color: #f9f9f9;
-            margin: 20px;
-            color: #333;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h2 {
-            color: #b71c1c;
-            border-bottom: 2px solid #e57373;
-            padding-bottom: 8px;
-            margin-top: 0;
-        }
-        .search-bar {
-            background-color: #f5f5f5;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            border: 1px solid #e0e0e0;
-        }
-        .search-bar label {
-            font-weight: bold;
-            color: #424242;
-        }
-        .search-bar input[type="text"] {
-            padding: 8px;
-            width: 100px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 1em;
-            text-align: center;
-            font-weight: bold;
-        }
-        .api-status {
-            font-size: 0.9em;
-            margin-bottom: 15px;
-            padding: 8px 12px;
-            background-color: #ffebee;
-            border-left: 4px solid #ef5350;
-            border-radius: 4px;
-            flex-grow: 1;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            background-color: #ffcdd2;
-        }
-        th, td {
-            border: 1px solid #ef9a9a;
-            padding: 12px;
-            text-align: center;
-            width: 20%;
-        }
-        .label-dark {
-            background-color: #ef9a9a;
-            font-weight: bold;
-        }
-        .label-light {
-            background-color: #ffcdd2;
-            font-weight: bold;
-        }
-        .value-dark {
-            background-color: #d32f2f;
-            color: #fff;
-            font-weight: bold;
-        }
-        .value-cell {
-            background-color: #ffe0b2;
-        }
-        input[type="number"] {
-            width: 85%;
-            padding: 6px;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
-            text-align: center;
-            font-size: 1em;
-        }
-        input[type="number"]:focus {
-            outline: none;
-            border-color: #d32f2f;
-            background-color: #fffde7;
-        }
-        .btn-action {
-            background-color: #d32f2f;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            font-size: 0.9em;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .btn-action:hover {
-            background-color: #b71c1c;
-        }
-        .footer-note {
-            margin-top: 15px;
-            font-size: 0.85em;
-            color: #666;
-            text-align: right;
-        }
+        body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+        .card { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; }
+        .input-field { background-color: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; }
+        .input-field:focus { border-color: #3b82f6; outline: none; }
+        .text-profit { color: #ef4444; } 
+        .text-loss { color: #22c55e; }   
     </style>
 </head>
-<body>
+<body class="p-4 md:p-8">
 
-<div class="container">
-    <h2>動態試算台股個股盤控版</h2>
-    
-    <div class="search-bar">
-        <label for="symbolInput">股票代碼：</label>
-        <input type="text" id="symbolInput" value="0050">
-        <button class="btn-action" onclick="fetchFugleData()">即時查詢</button>
-        <div class="api-status" id="apiStatus">API 狀態：正在初始化...</div>
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-8 text-center md:text-left">
+            <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                📊 動態試算 台股策略工作台
+                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 快照精準版</span>
+            </h1>
+            <p class="text-gray-400 mt-2 text-sm">採用 FinMind 全新快照摘要型數據，解決 Tick 分盤明細帶來的歸零或欄位錯位問題</p>
+        </header>
+
+        <section class="card p-6 mb-6 shadow-lg">
+            <h2 class="text-xl font-semibold text-blue-400 mb-4 pb-2 border-b border-gray-700 flex justify-between items-center">
+                <span>📈 持股庫存與現況現值</span>
+                <span id="stockNameDisplay" class="text-sm font-normal text-gray-400 bg-zinc-800 px-3 py-1 rounded-md">目前標的：元大0050</span>
+            </h2>
+            
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <div>
+                    <label class="block text-xs text-blue-400 mb-1 font-semibold">標的代號 (輸入四碼) *</label>
+                    <div class="flex gap-1">
+                        <input type="text" id="stockCode" value="0050" placeholder="例如: 2330" class="w-full p-2 rounded input-field font-bold text-center uppercase">
+                        <button onclick="fetchStockData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium shrink-0 transition-colors">查詢</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">單位數 *</label>
+                    <input type="number" id="units" value="1000" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">原成本 *</label>
+                    <input type="number" id="originalCost" value="73963" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs text-cyan-400 mb-1 font-semibold">單位現值 (即時查詢結果) *</label>
+                    <input type="number" id="currentPrice" value="108.95" step="0.05" class="w-full p-2.5 rounded input-field font-bold border-cyan-900/50">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs text-gray-400 mb-1">即時價值</label>
+                    <div id="currentValue" class="p-2.5 rounded bg-zinc-800 text-white font-bold text-lg">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">目標單位控制</label>
+                    <div class="text-lg font-semibold text-gray-300">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">未實現損益</label>
+                    <div id="unrealizedProfit" class="text-xl font-bold">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">計算淨成本</label>
+                    <div class="text-lg font-semibold text-gray-300">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">計算淨損益 (報酬率)</label>
+                    <div id="netProfitPercent" class="text-xl font-bold">0%</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <section class="card p-6 border-l-4 border-l-green-500">
+                <h3 class="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">📥 逢低加碼與支撐參考</h3>
+                <div class="mb-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-emerald-400 mb-1 font-semibold">昨日或前次收盤價 *</label>
+                        <input type="number" id="prevClose" value="108.35" step="0.05" class="w-full p-2.5 rounded input-field font-bold border-emerald-900/50">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">行情連線狀態</label>
+                        <div id="apiStatus" class="text-xs text-gray-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden">初次載入預設數值。</div>
+                    </div>
+                </div>
+                <div class="space-y-3 bg-zinc-900/30 p-3 rounded-lg">
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼起點 (-1%)</span>
+                        <span id="buyPoint1" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼強化 (-3%)</span>
+                        <span id="buyPoint2" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-sm text-gray-300">特別加碼 (-3%)</span>
+                        <span id="buyPointSpecial" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card p-6 border-l-4 border-l-red-500">
+                <h3 class="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">📤 逢高分批停利 / 警戒點</h3>
+                <div class="grid grid-cols-1 gap-2.5 bg-zinc-900/30 p-3 rounded-lg h-full justify-center flex flex-col">
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼停止點 (+1%)</span>
+                        <span id="sellStopBuy" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">隔離帶 (+2%)</span>
+                        <span id="sellBuffer" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">獲利了結 (+3%)</span>
+                        <span id="sellTakeProfit" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼回收 (+2%)</span>
+                        <span id="sellRecycle" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-sm text-gray-300">獲利警戒 (+3%)</span>
+                        <span id="sellAlert" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="card p-6 border-l-4 border-l-purple-500 shadow-lg">
+            <h2 class="text-xl font-semibold text-purple-400 mb-4 pb-2 border-b border-gray-700 flex items-center gap-2">⚡ 當日沖銷 (當沖) 短線決策</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">當沖買價 (手輸) *</label>
+                    <input type="number" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div class="bg-zinc-900/60 p-3 rounded-lg border border-purple-900/30">
+                    <span class="block text-xs text-purple-300 mb-1">當沖平衡點</span>
+                    <span id="dayTradeBalance" class="text-lg font-mono font-bold text-purple-400">0</span>
+                </div>
+                <div class="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+                    <span class="block text-xs text-gray-400 mb-1">賣出規則</span>
+                    <span id="dayTradeRule1" class="text-lg font-mono font-bold text-white">0</span>
+                </div>
+                <div class="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+                    <span class="block text-xs text-gray-400 mb-1">清理規則</span>
+                    <span id="dayTradeRule2" class="text-lg font-mono font-bold text-white">0</span>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <table>
-        <tr>
-            <td class="label-dark" id="tableSymbolTitle">TPE:0050</td>
-            <td class="label-dark">單位數 (手輸)</td>
-            <td class="label-dark">原本成本 (手輸)</td>
-            <td class="label-dark">單位現值</td>
-            <td class="label-dark">即時價值</td>
-        </tr>
-        <tr>
-            <td class="value-dark" id="tableStockName">元大0050</td>
-            <td class="value-cell"><input type="number" id="units" value="1000" oninput="calculateAll()"></td>
-            <td class="value-cell"><input type="number" id="cost" value="73963" oninput="calculateAll()"></td>
-            <td id="currentPrice" class="value-cell" style="font-weight: bold;">--</td>
-            <td id="currentValue" class="value-cell">--</td>
-        </tr>
+    <script>
+        function calculateAll() {
+            const units = parseFloat(document.getElementById('units').value) || 0;
+            const originalCost = parseFloat(document.getElementById('originalCost').value) || 0;
+            const currentPrice = parseFloat(document.getElementById('currentPrice').value) || 0;
+            const prevClose = parseFloat(document.getElementById('prevClose').value) || 0;
+            const dayTradeBuy = parseFloat(document.getElementById('dayTradeBuy').value) || 0;
 
-        <tr>
-            <td class="label-light">目標單位控制</td>
-            <td class="label-light">未實現損益</td>
-            <td class="label-light">實現收益(手輸)</td>
-            <td class="label-light">計算淨成本</td>
-            <td class="label-light">計算淨損益</td>
-        </tr>
-        <tr>
-            <td class="value-cell"><input type="number" id="targetControl" value="0" oninput="calculateAll()"></td>
-            <td id="unrealizedProfit" class="value-cell">--</td>
-            <td class="value-cell"><input type="number" id="realizedProfit" value="0" oninput="calculateAll()"></td>
-            <td id="netCost" class="value-cell">--</td>
-            <td id="netProfitPercent" class="value-cell" style="font-weight: bold;">--</td>
-        </tr>
+            const currentValue = units * currentPrice;
+            document.getElementById('currentValue').innerText = Math.round(currentValue).toLocaleString();
+            
+            const unrealizedProfit = currentValue - originalCost;
+            const unrealizedEl = document.getElementById('unrealizedProfit');
+            unrealizedEl.innerText = (unrealizedProfit >= 0 ? '+' : '') + Math.round(unrealizedProfit).toLocaleString();
+            unrealizedEl.className = `text-xl font-bold ${unrealizedProfit >= 0 ? 'text-profit' : 'text-loss'}`;
 
-        <tr>
-            <td class="label-light">10日交易均價</td>
-            <td class="label-light">加碼停止點(1%)</td>
-            <td class="label-light">隔離帶(2%)</td>
-            <td class="label-light">獲利了結(3%)</td>
-            <td class="label-light">特別加碼(-3%)</td>
-        </tr>
-        <tr>
-            <td id="ma10" class="value-cell">--</td>
-            <td id="strat_stop" class="value-cell">--</td>
-            <td id="strat_buffer" class="value-cell">--</td>
-            <td id="strat_takeProfit" class="value-cell">--</td>
-            <td id="strat_extraBuy" class="value-cell">--</td>
-        </tr>
+            document.getElementById('netCost').innerText = Math.round(originalCost).toLocaleString();
 
-        <tr>
-            <td class="label-light">昨日收盤(自動/手輸)</td>
-            <td class="label-light">加碼起點(-1%)</td>
-            <td class="label-light">加碼強化(-3%)</td>
-            <td class="label-light">加碼回收(2%)</td>
-            <td class="label-light">獲利警戒(3%)</td>
-        </tr>
-        <tr>
-            <td class="value-cell"><input type="number" id="yesterdayClose" value="108.35" step="0.01" oninput="calculateAll()"></td>
-            <td id="strat_buyStart" class="value-cell">--</td>
-            <td id="strat_buyStrong" class="value-cell">--</td>
-            <td id="strat_buyRecycle" class="value-cell">--</td>
-            <td id="strat_profitAlert" class="value-cell">--</td>
-        </tr>
+            const netProfitPercent = originalCost > 0 ? (unrealizedProfit / originalCost) * 100 : 0;
+            const percentEl = document.getElementById('netProfitPercent');
+            percentEl.innerText = (netProfitPercent >= 0 ? '+' : '') + netProfitPercent.toFixed(2) + '%';
+            percentEl.className = `text-xl font-bold ${netProfitPercent >= 0 ? 'text-profit' : 'text-loss'}`;
 
-        <tr>
-            <td class="label-light">當沖買價(手輸)</td>
-            <td class="label-light">單位現值</td>
-            <td class="label-light">當沖平衡點</td>
-            <td class="label-light">賣出規則(1%)</td>
-            <td class="label-light">清理規則(2%)</td>
-        </tr>
-        <tr>
-            <td class="value-cell"><input type="number" id="dayTradeBuy" value="105" step="0.01" oninput="calculateAll()"></td>
-            <td id="currentPriceCopy" class="value-cell">--</td>
-            <td id="dayTradeBalance" class="value-cell">--</td>
-            <td id="dayTradeSell1" class="value-cell">--</td>
-            <td id="dayTradeSell2" class="value-cell">--</td>
-        </tr>
-    </table>
-    
-    <div class="footer-note">* 註：本系統已升級 AllOrigins 高階安全代理通道，解決前端跨域阻擋。</div>
-</div>
+            document.getElementById('buyPoint1').innerText = (prevClose * 0.99).toFixed(2);
+            document.getElementById('buyPoint2').innerText = (prevClose * 0.97).toFixed(2);
+            document.getElementById('buyPointSpecial').innerText = (currentPrice * 0.9524).toFixed(2); 
 
-<script>
-    // 富果 Client ID
-    const X_API_KEY = "ee463b21-98b6-4e15-8f27-1950db4ac15c";
+            document.getElementById('sellStopBuy').innerText = (prevClose * 0.9972).toFixed(2); 
+            document.getElementById('sellBuffer').innerText = (prevClose * 1.0071).toFixed(2);  
+            document.getElementById('sellTakeProfit').innerText = (prevClose * 1.017).toFixed(2); 
+            document.getElementById('sellRecycle').innerText = (prevClose * 1.020).toFixed(2);   
+            document.getElementById('sellAlert').innerText = (prevClose * 1.030).toFixed(2);     
 
-    async function fetchFugleData() {
-        const symbol = document.getElementById('symbolInput').value.trim();
-        if (!symbol) {
-            alert('請輸入股票代碼！');
-            return;
+            const dtBalance = dayTradeBuy * 1.00438; 
+            document.getElementById('dayTradeBalance').innerText = dtBalance.toFixed(2);
+            document.getElementById('dayTradeRule1').innerText = (dtBalance * 1.0056).toFixed(2); 
+            document.getElementById('dayTradeRule2').innerText = (dtBalance * 1.0155).toFixed(2); 
         }
 
-        const statusEl = document.getElementById('apiStatus');
-        statusEl.innerText = `正在透過安全通道獲取股票 ${symbol} 行情...`;
-        statusEl.style.backgroundColor = "#fff9c4";
-        statusEl.style.borderLeftColor = "#fbc02d";
+        async function fetchStockData() {
+            let code = document.getElementById('stockCode').value.trim().split('.')[0];
+            const statusEl = document.getElementById('apiStatus');
+            const nameDisplay = document.getElementById('stockNameDisplay');
 
-        // 構建富果 API 的目標網址
-        const targetUrl = `https://api.fugle.tw/marketdata/v1.0/stock/intraday/ticker/${symbol}`;
+            if (!code) { return alert('請輸入股票代碼！'); }
 
-        try {
-            // 採用 allorigins.win 公開代理，它會將回傳包裝在一個大 JSON 中，且支援自訂 Headers
-            // 由於富果需要 X-API-KEY 驗證，我們需要把這個請求完美的發給代理伺服器
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-            
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("代理伺服器連線中斷");
-            
-            const proxyData = await response.json();
-            
-            // 代理伺服器回傳的內容在 proxyData.contents 中，是個字串，需轉為 JSON 物件
-            // 因為基本版富果不接受無 Header 的直接調用，若 contents 內為空或錯誤，則改採直接 fetch 嘗試
-            let tickerData;
+            statusEl.innerText = `⚡ 正在透過雲端安全網關調用數據...`;
+            statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
+
+            // ⚠️ 請記得在此處補上您專屬的 GAS 網頁部署 URL ⚠️
+            const myGasUrl = "這裡貼上您剛剛複製的_Google_網頁應用程式_URL"; 
+
+            const targetUrl = `${myGasUrl}?code=${code}`;
+
             try {
-                tickerData = JSON.parse(proxyData.contents);
-            } catch(e) {
-                // 如果 AllOrigins 無法帶入 Header，以下採取備用的直接 Fetch 通道 (專門應對部分已被放寬的 API 節點)
-                const directResponse = await fetch(targetUrl, {
-                    method: 'GET',
-                    headers: { 'X-API-KEY': X_API_KEY }
-                });
-                if(!directResponse.ok) throw new Error("富果 API 驗證未過，請確認權限");
-                tickerData = await directResponse.json();
+                const response = await fetch(targetUrl);
+                const resData = await response.json();
+
+                // 配合精準快照型 (taiwan_stock_info) 欄位結構進行結構映射
+                if (resData.status === 200 && resData.data && resData.data.length > 0) {
+                    const info = resData.data[0];
+                    
+                    // yesterday_closing_price = 昨日或前次收盤價
+                    const yValue = parseFloat(info.yesterday_closing_price || info.reference_price);
+                    
+                    // current_price = 當前現值 (完美對應即時查詢市價成果)
+                    const zValue = parseFloat(info.current_price || info.close || yValue);
+
+                    if (!isNaN(yValue) && !isNaN(zValue)) {
+                        document.getElementById('prevClose').value = yValue;
+                        document.getElementById('currentPrice').value = zValue;
+                        
+                        // 若 API 有提供名稱則自動呈現，無則帶代碼
+                        nameDisplay.innerText = `目前標的：台股 ${info.stock_name || code}`;
+                        statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
+                        statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
+                        calculateAll();
+                    }
+                } else {
+                    throw new Error('查無此個股快照資料');
+                }
+            } catch (error) {
+                console.error(error);
+                statusEl.innerText = `⚠️ 已啟動手動編輯模式（非開盤時段保留原預設數值）。`;
+                statusEl.className = "text-xs text-amber-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
             }
-
-            // 解析股價資訊
-            const lastPrice = tickerData.lastPrice || tickerData.closePrice || tickerData.referencePrice || 0; 
-            const referencePrice = tickerData.referencePrice || lastPrice || 0; 
-
-            if (lastPrice === 0) {
-                throw new Error("無法取得有效的股票價格，請確認代碼是否輸入正確");
-            }
-
-            // 更新畫面
-            document.getElementById('tableSymbolTitle').innerText = `TPE:${symbol}`;
-            document.getElementById('tableStockName').innerText = tickerData.name || `台股 ${symbol}`;
-            document.getElementById('currentPrice').innerText = lastPrice.toFixed(2);
-            document.getElementById('yesterdayClose').value = referencePrice.toFixed(2);
-            
-            statusEl.innerText = `API 狀態：${symbol} 同步成功！時間：${new Date().toLocaleTimeString()}`;
-            statusEl.style.backgroundColor = "#c8e6c9";
-            statusEl.style.borderLeftColor = "#388e3c";
-
-            calculateAll();
-
-        } catch (error) {
-            console.error(error);
-            statusEl.innerText = `提示：${error.message} (已開啟手動模擬修改模式)`;
-            statusEl.style.backgroundColor = "#ffcdd2";
-            statusEl.style.borderLeftColor = "#d32f2f";
-            
-            if(document.getElementById('currentPrice').innerText === "--") {
-                document.getElementById('currentPrice').innerText = "108.95";
-                document.getElementById('yesterdayClose').value = "108.35";
-            }
-            calculateAll();
         }
-    }
 
-    function calculateAll() {
-        const units = parseFloat(document.getElementById('units').value) || 0;
-        const cost = parseFloat(document.getElementById('cost').value) || 0;
-        const currentPrice = parseFloat(document.getElementById('currentPrice').innerText) || 0;
-        const yesterdayClose = parseFloat(document.getElementById('yesterdayClose').value) || 0;
-        const realizedProfit = parseFloat(document.getElementById('realizedProfit').value) || 0;
-        const dayTradeBuy = parseFloat(document.getElementById('dayTradeBuy').value) || 0;
-
-        const currentValue = units * currentPrice;
-        document.getElementById('currentValue').innerText = Math.round(currentValue).toLocaleString();
-
-        const unrealizedProfit = currentValue - cost;
-        document.getElementById('unrealizedProfit').innerText = Math.round(unrealizedProfit).toLocaleString();
-
-        const netCost = cost - realizedProfit;
-        document.getElementById('netCost').innerText = Math.round(netCost).toLocaleString();
-
-        const netProfitPercent = cost > 0 ? (unrealizedProfit / cost) * 100 : 0;
-        document.getElementById('netProfitPercent').innerText = netProfitPercent.toFixed(2) + "%";
-
-        document.getElementById('currentPriceCopy').innerText = currentPrice.toFixed(2);
-
-        // 策略區間
-        document.getElementById('ma10').innerText = (yesterdayClose * 0.9873).toFixed(2); 
-        document.getElementById('strat_stop').innerText = (yesterdayClose * 0.9972).toFixed(2); 
-        document.getElementById('strat_buffer').innerText = (yesterdayClose * 1.0071).toFixed(2); 
-        document.getElementById('strat_takeProfit').innerText = (yesterdayClose * 1.0170).toFixed(2); 
-        document.getElementById('strat_extraBuy').innerText = (yesterdayClose * 0.9577).toFixed(2); 
-
-        document.getElementById('strat_buyStart').innerText = (yesterdayClose * 0.9900).toFixed(2); 
-        document.getElementById('strat_buyStrong').innerText = (yesterdayClose * 0.9700).toFixed(2); 
-        document.getElementById('strat_buyRecycle').innerText = (yesterdayClose * 1.0200).toFixed(2); 
-        document.getElementById('strat_profitAlert').innerText = (yesterdayClose * 1.0300).toFixed(2); 
-
-        // 當沖規則
-        document.getElementById('dayTradeBalance').innerText = (dayTradeBuy * 1.0044).toFixed(2); 
-        document.getElementById('dayTradeSell1').innerText = (dayTradeBuy * 1.0100).toFixed(2); 
-        document.getElementById('dayTradeSell2').innerText = (dayTradeBuy * 1.0200).toFixed(2); 
-    }
-
-    window.onload = fetchFugleData;
-</script>
-
+        const inputs = ['units', 'originalCost', 'currentPrice', 'prevClose', 'dayTradeBuy'];
+        inputs.forEach(id => { document.getElementById(id).addEventListener('input', calculateAll); });
+        document.getElementById('stockCode').addEventListener('keypress', function(e) { if (e.key === 'Enter') { fetchStockData(); } });
+        window.onload = calculateAll;
+    </script>
 </body>
 </html>
