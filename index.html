@@ -195,17 +195,17 @@
             document.getElementById('dayTradeRule2').innerText = (dtBalance * 1.0155).toFixed(2); 
         }
 
-        async function fetchStockData() {
+async function fetchStockData() {
             let code = document.getElementById('stockCode').value.trim().split('.')[0];
             const statusEl = document.getElementById('apiStatus');
             const nameDisplay = document.getElementById('stockNameDisplay');
 
             if (!code) { return alert('請輸入股票代碼！'); }
 
-            statusEl.innerText = `⚡ 正在透過雲端安全網關調用數據...`;
+            statusEl.innerText = `⚡ 正在透過雲端網關調用數據...`;
             statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
 
-            // ⚠️ 請記得在此處補上您專屬的 GAS 網頁部署 URL ⚠️
+            // ⚠️ 請確保此處為您最新的 GAS 網址 ⚠️
             const myGasUrl = "這裡貼上您原本複製的_Google_網頁應用程式_URL"; 
 
             const targetUrl = `${myGasUrl}?code=${code}`;
@@ -217,31 +217,33 @@
                 if (resData.status === 200 && resData.data && resData.data.length > 0) {
                     const info = resData.data[0];
                     
-                    // 【雙向相容對接機制】同時滿足 FinMind 中 ETF 與個股不同的欄位名定義
-                    // 昨日/前次收盤價優先級：yesterday_closing_price (ETF) -> ReferencePrice (個股) -> reference_price (備用)
-                    const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price);
-                    
-                    // 單位現值優先級：current_price (ETF) -> DealPrice (個股) -> close (備用)
-                    const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || yValue);
+                    // 【萬能相容鎖定】遍歷所有可能出現的昨收與成交價欄位代名詞
+                    const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price || info.yesterdayClosingPrice);
+                    const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || info.currentPrice);
 
-                    if (!isNaN(yValue) && !isNaN(zValue)) {
+                    // 檢查數據是否合法（排除0或非數字）
+                    if (!isNaN(yValue) && yValue > 0 && !isNaN(zValue) && zValue > 0) {
                         document.getElementById('prevClose').value = yValue;
                         document.getElementById('currentPrice').value = zValue;
                         
-                        nameDisplay.innerText = `目前標的：台股 ${info.stock_name || info.StockName || code}`;
+                        const sName = info.stock_name || info.StockName || info.name || code;
+                        nameDisplay.innerText = `目前標的：台股 ${sName}`;
                         statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
                         statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
-                        calculateAll();
+                        
+                        calculateAll(); // 觸發計算
                     } else {
-                        throw new Error('欄位解析異常');
+                        // 如果數字不對，把 API 回傳的物件轉成文字顯示在畫面上，方便除錯
+                        statusEl.innerText = `⚠️ 欄位解析不符，抓到昨收: ${yValue}, 現值: ${zValue}`;
+                        statusEl.className = "text-xs text-orange-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                     }
                 } else {
-                    throw new Error('查無此個股快照資料');
+                    throw new Error('API 回傳結構空值');
                 }
             } catch (error) {
                 console.error(error);
-                statusEl.innerText = `⚠️ 已啟動手動編輯模式（非開盤時段保留原預設數值）。`;
-                statusEl.className = "text-xs text-amber-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
+                statusEl.innerText = `❌ 網關連線失敗或無權限。請確認 GAS 是否成功部署「新版本」。`;
+                statusEl.className = "text-xs text-red-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
             }
         }
 
