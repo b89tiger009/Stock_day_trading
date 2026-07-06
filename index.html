@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態試算 台股策略工具 (個股/ETF 雙相容精準版)</title>
+    <title>動態試算 台股策略工作台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
         .card { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; }
         .input-field { background-color: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; }
         .input-field:focus { border-color: #3b82f6; outline: none; }
-        .text-profit { color: #ef4444; } 
-        .text-loss { color: #22c55e; }   
+        .text-profit { color: #ef4444; } /* 台灣股市習慣：紅字為正(獲利) */
+        .text-loss { color: #22c55e; }   /* 綠字為負(虧損) */
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -20,9 +20,9 @@
         <header class="mb-8 text-center md:text-left">
             <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
                 📊 動態試算 台股策略工作台
-                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 雙相容精準版</span>
+                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 精準連動版</span>
             </h1>
-            <p class="text-gray-400 mt-2 text-sm">已修正 FinMind 個股與 ETF 欄位命名相異問題，完美連動 2330 等台股個股</p>
+            <p class="text-gray-400 mt-2 text-sm">採用您專屬的 Google Apps Script 雲端網關直連 FinMind 快照型數據庫</p>
         </header>
 
         <section class="card p-6 mb-6 shadow-lg">
@@ -138,7 +138,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                 <div>
                     <label class="block text-xs text-amber-400 mb-1">當沖買價 (手輸) *</label>
-                    <input type="number" id="dayDayBuy" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
+                    <input type="number" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
                 </div>
                 <div class="bg-zinc-900/60 p-3 rounded-lg border border-purple-900/30">
                     <span class="block text-xs text-purple-300 mb-1">當沖平衡點</span>
@@ -153,6 +153,7 @@
                     <span id="dayTradeRule2" class="text-lg font-mono font-bold text-white">0</span>
                 </div>
             </div>
+            <p class="text-xs text-gray-500 mt-3">※ 當沖平衡點已考量基本交易稅減半與手續費預估估算值 (依原圖 105 $\rightarrow$ 105.46 邏輯自動校正)。</p>
         </section>
     </div>
 
@@ -195,7 +196,7 @@
             document.getElementById('dayTradeRule2').innerText = (dtBalance * 1.0155).toFixed(2); 
         }
 
-async function fetchStockData() {
+        async function fetchStockData() {
             let code = document.getElementById('stockCode').value.trim().split('.')[0];
             const statusEl = document.getElementById('apiStatus');
             const nameDisplay = document.getElementById('stockNameDisplay');
@@ -205,8 +206,8 @@ async function fetchStockData() {
             statusEl.innerText = `⚡ 正在透過雲端網關調用數據...`;
             statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
 
-            // ⚠️ 請確保此處為您最新的 GAS 網址 ⚠️
-            const myGasUrl = "這裡貼上您原本複製的_Google_網頁應用程式_URL"; 
+            // 帶入您專屬部署成功的 Google Apps Script 網頁應用程式 URL
+            const myGasUrl = "https://script.google.com/macros/s/AKfycbwivX-TlWAsWsPKTUx3iWp0MbrB99TxKRXI_ro3Hqgnr6tEqAPUGY8jmIMgET4bp6kcKg/exec"; 
 
             const targetUrl = `${myGasUrl}?code=${code}`;
 
@@ -217,11 +218,10 @@ async function fetchStockData() {
                 if (resData.status === 200 && resData.data && resData.data.length > 0) {
                     const info = resData.data[0];
                     
-                    // 【萬能相容鎖定】遍歷所有可能出現的昨收與成交價欄位代名詞
+                    // 【萬能欄位解碼機制】遍歷並相容 FinMind 中個股 (大寫) 與 ETF (小寫) 的命名規則差異
                     const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price || info.yesterdayClosingPrice);
-                    const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || info.currentPrice);
+                    const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || info.currentPrice || yValue);
 
-                    // 檢查數據是否合法（排除0或非數字）
                     if (!isNaN(yValue) && yValue > 0 && !isNaN(zValue) && zValue > 0) {
                         document.getElementById('prevClose').value = yValue;
                         document.getElementById('currentPrice').value = zValue;
@@ -231,9 +231,8 @@ async function fetchStockData() {
                         statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
                         statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                         
-                        calculateAll(); // 觸發計算
+                        calculateAll(); // 自動刷新計算
                     } else {
-                        // 如果數字不對，把 API 回傳的物件轉成文字顯示在畫面上，方便除錯
                         statusEl.innerText = `⚠️ 欄位解析不符，抓到昨收: ${yValue}, 現值: ${zValue}`;
                         statusEl.className = "text-xs text-orange-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                     }
