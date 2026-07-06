@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動態試算 台股策略工具 (GAS 快照精準版)</title>
+    <title>動態試算 台股策略工具 (個股/ETF 雙相容精準版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
@@ -20,9 +20,9 @@
         <header class="mb-8 text-center md:text-left">
             <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
                 📊 動態試算 台股策略工作台
-                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 快照精準版</span>
+                <span class="text-xs bg-emerald-600 text-white px-2.5 py-1 rounded-full font-normal">GAS 雙相容精準版</span>
             </h1>
-            <p class="text-gray-400 mt-2 text-sm">採用 FinMind 全新快照摘要型數據，解決 Tick 分盤明細帶來的歸零或欄位錯位問題</p>
+            <p class="text-gray-400 mt-2 text-sm">已修正 FinMind 個股與 ETF 欄位命名相異問題，完美連動 2330 等台股個股</p>
         </header>
 
         <section class="card p-6 mb-6 shadow-lg">
@@ -138,7 +138,7 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                 <div>
                     <label class="block text-xs text-amber-400 mb-1">當沖買價 (手輸) *</label>
-                    <input type="number" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
+                    <input type="number" id="dayDayBuy" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
                 </div>
                 <div class="bg-zinc-900/60 p-3 rounded-lg border border-purple-900/30">
                     <span class="block text-xs text-purple-300 mb-1">當沖平衡點</span>
@@ -206,7 +206,7 @@
             statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
 
             // ⚠️ 請記得在此處補上您專屬的 GAS 網頁部署 URL ⚠️
-            const myGasUrl = "這裡貼上您剛剛複製的_Google_網頁應用程式_URL"; 
+            const myGasUrl = "這裡貼上您原本複製的_Google_網頁應用程式_URL"; 
 
             const targetUrl = `${myGasUrl}?code=${code}`;
 
@@ -214,25 +214,26 @@
                 const response = await fetch(targetUrl);
                 const resData = await response.json();
 
-                // 配合精準快照型 (taiwan_stock_info) 欄位結構進行結構映射
                 if (resData.status === 200 && resData.data && resData.data.length > 0) {
                     const info = resData.data[0];
                     
-                    // yesterday_closing_price = 昨日或前次收盤價
-                    const yValue = parseFloat(info.yesterday_closing_price || info.reference_price);
+                    // 【雙向相容對接機制】同時滿足 FinMind 中 ETF 與個股不同的欄位名定義
+                    // 昨日/前次收盤價優先級：yesterday_closing_price (ETF) -> ReferencePrice (個股) -> reference_price (備用)
+                    const yValue = parseFloat(info.yesterday_closing_price || info.ReferencePrice || info.reference_price);
                     
-                    // current_price = 當前現值 (完美對應即時查詢市價成果)
-                    const zValue = parseFloat(info.current_price || info.close || yValue);
+                    // 單位現值優先級：current_price (ETF) -> DealPrice (個股) -> close (備用)
+                    const zValue = parseFloat(info.current_price || info.DealPrice || info.close || info.deal_price || yValue);
 
                     if (!isNaN(yValue) && !isNaN(zValue)) {
                         document.getElementById('prevClose').value = yValue;
                         document.getElementById('currentPrice').value = zValue;
                         
-                        // 若 API 有提供名稱則自動呈現，無則帶代碼
-                        nameDisplay.innerText = `目前標的：台股 ${info.stock_name || code}`;
+                        nameDisplay.innerText = `目前標的：台股 ${info.stock_name || info.StockName || code}`;
                         statusEl.innerText = `✅ 數據同步成功！(前次收盤: ${yValue} / 單位現值: ${zValue})`;
                         statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center";
                         calculateAll();
+                    } else {
+                        throw new Error('欄位解析異常');
                     }
                 } else {
                     throw new Error('查無此個股快照資料');
