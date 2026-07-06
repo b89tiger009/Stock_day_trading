@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動態試算 台股策略工具 (FinMind API 正式版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #121212; color: #e0e0e0; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+        .card { background-color: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 12px; }
+        .input-field { background-color: #2a2a2a; border: 1px solid #3a3a3a; color: #ffffff; }
+        .input-field:focus { border-color: #3b82f6; outline: none; }
+        .text-profit { color: #ef4444; } /* 台灣股市習慣：紅字為正(獲利) */
+        .text-loss { color: #22c55e; }   /* 綠字為負(虧損) */
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-8 text-center md:text-left">
+            <h1 class="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-2">
+                📊 動態試算 台股策略工作台
+                <span class="text-xs bg-amber-600 text-white px-2.5 py-1 rounded-full font-normal">FinMind API 正式版</span>
+            </h1>
+            <p class="text-gray-400 mt-2 text-sm">已成功整合 FinMind 專屬 Token，支援上市、上櫃個股與 ETF 行情即時連動</p>
+        </header>
+
+        <section class="card p-6 mb-6 shadow-lg">
+            <h2 class="text-xl font-semibold text-blue-400 mb-4 pb-2 border-b border-gray-700 flex justify-between items-center">
+                <span>📈 持股庫存與現況現值</span>
+                <span id="stockNameDisplay" class="text-sm font-normal text-gray-400 bg-zinc-800 px-3 py-1 rounded-md">目前標的：元大0050</span>
+            </h2>
+            
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <div>
+                    <label class="block text-xs text-blue-400 mb-1 font-semibold">標的代號 (輸入四碼) *</label>
+                    <div class="flex gap-1">
+                        <input type="text" id="stockCode" value="0050" placeholder="例如: 2330" class="w-full p-2 rounded input-field font-bold text-center uppercase">
+                        <button onclick="fetchStockData()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium shrink-0 transition-colors">查詢</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">單位數 (手輸股數) *</label>
+                    <input type="number" id="units" value="1000" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">原成本 (手輸總額) *</label>
+                    <input type="number" id="originalCost" value="73963" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">單位現值 (目前股價) *</label>
+                    <input type="number" id="currentPrice" value="108.95" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div class="col-span-2 md:col-span-1">
+                    <label class="block text-xs text-gray-400 mb-1">即時價值</label>
+                    <div id="currentValue" class="p-2.5 rounded bg-zinc-800 text-white font-bold text-lg">0</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">目標單位控制</label>
+                    <div class="text-lg font-semibold text-gray-300">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">未實現損益</label>
+                    <div id="unrealizedProfit" class="text-xl font-bold">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">計算淨成本</label>
+                    <div class="text-lg font-semibold text-gray-300">0</div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">計算淨損益 (報酬率)</label>
+                    <div id="netProfitPercent" class="text-xl font-bold">0%</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            
+            <section class="card p-6 border-l-4 border-l-green-500">
+                <h3 class="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
+                    📥 逢低加碼與支撐參考
+                </h3>
+                <div class="mb-4 grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-emerald-400 mb-1 font-semibold">昨日收盤價 (已自動帶入) *</label>
+                        <input type="number" id="prevClose" value="108.35" step="0.05" class="w-full p-2.5 rounded input-field font-bold border-emerald-900/50">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">行情連線狀態</label>
+                        <div id="apiStatus" class="text-xs text-gray-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden">初次載入預設數值。</div>
+                    </div>
+                </div>
+                <div class="space-y-3 bg-zinc-900/30 p-3 rounded-lg">
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼起點 (-1%)</span>
+                        <span id="buyPoint1" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼強化 (-3%)</span>
+                        <span id="buyPoint2" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-sm text-gray-300">特別加碼 (-3%) <span class="text-xs text-gray-500">(依現值計)</span></span>
+                        <span id="buyPointSpecial" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card p-6 border-l-4 border-l-red-500">
+                <h3 class="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                    📤 逢高分批停利 / 警戒點
+                </h3>
+                <div class="grid grid-cols-1 gap-2.5 bg-zinc-900/30 p-3 rounded-lg h-full justify-center flex flex-col">
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼停止點 (+1%)</span>
+                        <span id="sellStopBuy" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">隔離帶 (+2%)</span>
+                        <span id="sellBuffer" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">獲利了結 (+3%)</span>
+                        <span id="sellTakeProfit" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-zinc-800">
+                        <span class="text-sm text-gray-300">加碼回收 (+2%)</span>
+                        <span id="sellRecycle" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-sm text-gray-300">獲利警戒 (+3%)</span>
+                        <span id="sellAlert" class="text-base font-mono font-bold text-white">0</span>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <section class="card p-6 border-l-4 border-l-purple-500 shadow-lg">
+            <h2 class="text-xl font-semibold text-purple-400 mb-4 pb-2 border-b border-gray-700 flex items-center gap-2">
+                ⚡ 當日沖銷 (當沖) 短線決策
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                <div>
+                    <label class="block text-xs text-amber-400 mb-1">當沖買價 (手輸) *</label>
+                    <input type="number" id="dayTradeBuy" value="105" step="0.05" class="w-full p-2.5 rounded input-field font-bold">
+                </div>
+                <div class="bg-zinc-900/60 p-3 rounded-lg border border-purple-900/30">
+                    <span class="block text-xs text-purple-300 mb-1">當沖平衡點 (打平獲利點)</span>
+                    <span id="dayTradeBalance" class="text-lg font-mono font-bold text-purple-400">0</span>
+                </div>
+                <div class="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+                    <span class="block text-xs text-gray-400 mb-1">賣出規則 (平衡點 +1%)</span>
+                    <span id="dayTradeRule1" class="text-lg font-mono font-bold text-white">0</span>
+                </div>
+                <div class="bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+                    <span class="block text-xs text-gray-400 mb-1">清理規則 (平衡點 +2%)</span>
+                    <span id="dayTradeRule2" class="text-lg font-mono font-bold text-white">0</span>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">※ 當沖平衡點已考量基本交易稅減半與手續費預估估算值 (依原圖 105 $\rightarrow$ 105.46 邏輯自動校正)。</p>
+        </section>
+
+        <footer class="mt-8 text-center text-xs text-gray-600">
+            精準還原動態試算規則 • 資料來源：FinMind 台灣開源財經資料庫
+        </footer>
+    </div>
+
+    <script>
+        // 1. 核心動態試算公式 (對齊原始試算表比例與邏輯)
+        function calculateAll() {
+            const units = parseFloat(document.getElementById('units').value) || 0;
+            const originalCost = parseFloat(document.getElementById('originalCost').value) || 0;
+            const currentPrice = parseFloat(document.getElementById('currentPrice').value) || 0;
+            const prevClose = parseFloat(document.getElementById('prevClose').value) || 0;
+            const dayTradeBuy = parseFloat(document.getElementById('dayTradeBuy').value) || 0;
+
+            // 庫存損益計算
+            const currentValue = units * currentPrice;
+            document.getElementById('currentValue').innerText = Math.round(currentValue).toLocaleString();
+            
+            const unrealizedProfit = currentValue - originalCost;
+            const unrealizedEl = document.getElementById('unrealizedProfit');
+            unrealizedEl.innerText = (unrealizedProfit >= 0 ? '+' : '') + Math.round(unrealizedProfit).toLocaleString();
+            unrealizedEl.className = `text-xl font-bold ${unrealizedProfit >= 0 ? 'text-profit' : 'text-loss'}`;
+
+            document.getElementById('netCost').innerText = Math.round(originalCost).toLocaleString();
+
+            const netProfitPercent = originalCost > 0 ? (unrealizedProfit / originalCost) * 100 : 0;
+            const percentEl = document.getElementById('netProfitPercent');
+            percentEl.innerText = (netProfitPercent >= 0 ? '+' : '') + netProfitPercent.toFixed(2) + '%';
+            percentEl.className = `text-xl font-bold ${netProfitPercent >= 0 ? 'text-profit' : 'text-loss'}`;
+
+            // 策略加減碼點計算
+            document.getElementById('buyPoint1').innerText = (prevClose * 0.99).toFixed(2);
+            document.getElementById('buyPoint2').innerText = (prevClose * 0.97).toFixed(2);
+            document.getElementById('buyPointSpecial').innerText = (currentPrice * 0.9524).toFixed(2); 
+
+            // 停利與警戒點
+            document.getElementById('sellStopBuy').innerText = (prevClose * 0.9972).toFixed(2); 
+            document.getElementById('sellBuffer').innerText = (prevClose * 1.0071).toFixed(2);  
+            document.getElementById('sellTakeProfit').innerText = (prevClose * 1.017).toFixed(2); 
+            document.getElementById('sellRecycle').innerText = (prevClose * 1.020).toFixed(2);   
+            document.getElementById('sellAlert').innerText = (prevClose * 1.030).toFixed(2);     
+
+            // 當沖短線計算
+            const dtBalance = dayTradeBuy * 1.00438; 
+            document.getElementById('dayTradeBalance').innerText = dtBalance.toFixed(2);
+            document.getElementById('dayTradeRule1').innerText = (dtBalance * 1.0056).toFixed(2); 
+            document.getElementById('dayTradeRule2').innerText = (dtBalance * 1.0155).toFixed(2); 
+        }
+
+        // 2. FinMind API 串接核心邏輯
+        async function fetchStockData() {
+            // 擷取並格式化代碼，FinMind 不需要後綴
+            let code = document.getElementById('stockCode').value.trim().split('.')[0];
+            const statusEl = document.getElementById('apiStatus');
+            const nameDisplay = document.getElementById('stockNameDisplay');
+
+            if (!code) {
+                alert('請輸入股票或 ETF 代碼！');
+                return;
+            }
+
+            statusEl.innerText = `🔍 正在透過 FinMind API 查詢台股 [${code}]...`;
+            statusEl.className = "text-xs text-yellow-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden";
+
+            // 帶入您配發的專屬 FinMind JWT Token
+            const token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYjg5MDA5QGdtYWlsLmNvbSIsImVtYWlsIjoiYjg5MDA5QGdtYWlsLmNvbSIsInRva2VuX3ZlcnNpb24iOjB9.UbK9daa9MQOUCbvMTKy3zgCeBQUhI_W-3XxyULLvPdc"; 
+
+            // FinMind 即時/當日個股快照 API 端點
+            const finMindUrl = `https://api.finmindtrade.com/api/v4/taiwan_stock_price_tick?stock_id=${code}&token=${token}`;
+
+            try {
+                const response = await fetch(finMindUrl);
+                if (!response.ok) throw new Error(`FinMind 伺服器回應異常 (狀態碼: ${response.status})`);
+                
+                const resData = await response.json();
+
+                // 檢查回傳狀態與是否有資料
+                if (resData.status === 200 && resData.data && resData.data.length > 0) {
+                    // FinMind 快照通常會回傳多條分盤細目，我們直接抓取最新的一條 (最後一筆)
+                    const latestData = resData.data[resData.data.length - 1];
+                    
+                    // FinMind 欄位對應：
+                    // reference_price = 昨日收盤價 (平盤價)
+                    // close = 當前成交價 / 盤後收盤價
+                    const yValue = parseFloat(latestData.reference_price);
+                    let zValue = parseFloat(latestData.close || latestData.deal_price);
+
+                    if (isNaN(zValue) || zValue === 0) {
+                        zValue = parseFloat(latestData.open) || yValue;
+                    }
+
+                    if (!isNaN(yValue)) {
+                        document.getElementById('prevClose').value = yValue;
+                        document.getElementById('currentPrice').value = zValue;
+                        
+                        nameDisplay.innerText = `目前標的：台股 ${code}`;
+                        statusEl.innerText = `✅ FinMind 同步成功！昨收: ${yValue} / 目前現值: ${zValue}`;
+                        statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden";
+                        
+                        calculateAll(); // 觸發試算表重算
+                    } else {
+                        throw new Error('FinMind 回傳之價格欄位不完整。');
+                    }
+                } else {
+                    // 如果 FinMind 回傳沒資料 (例如代碼找不到)，觸發自動降級保底機制
+                    console.warn("FinMind 未回傳該股資料，自動切換至備用公共通道...");
+                    fetchFromYahooBackup(code, statusEl, nameDisplay);
+                }
+
+            } catch (error) {
+                console.error("FinMind 連線異常:", error);
+                // 網路斷線或其他未知錯誤，一律由備用節點接手保證網頁可用
+                fetchFromYahooBackup(code, statusEl, nameDisplay);
+            }
+        }
+
+        // 備用數據節點：當例假日或 API 額度用罄時，由此處無縫接手
+        async function fetchFromYahooBackup(code, statusEl, nameDisplay) {
+            statusEl.innerText = `🔄 FinMind 通道受限，已自動切換至保底通道抓取 [${code}]...`;
+            
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.TW`;
+
+            try {
+                const response = await fetch(yahooUrl);
+                const json = await response.json();
+                const result = json.chart.result[0];
+                
+                const yValue = parseFloat(result.meta.previousClose);
+                const zValue = parseFloat(result.meta.regularMarketPrice);
+
+                if (!isNaN(yValue) && !isNaN(zValue)) {
+                    document.getElementById('prevClose').value = yValue;
+                    document.getElementById('currentPrice').value = zValue;
+                    
+                    nameDisplay.innerText = `目前標的：台股 ${code} (備用源)`;
+                    statusEl.innerText = `✅ 數據同步成功！(昨收: ${yValue} / 現值: ${zValue})`;
+                    statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden";
+                    
+                    calculateAll();
+                } else {
+                    throw new Error('上市通道解析失敗');
+                }
+            } catch (e) {
+                // 上市找不到則自動切換至上櫃市場後綴 (.TWO)
+                try {
+                    const otcUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${code}.TWO`;
+                    const response = await fetch(otcUrl);
+                    const json = await response.json();
+                    const result = json.chart.result[0];
+                    const yValue = parseFloat(result.meta.previousClose);
+                    const zValue = parseFloat(result.meta.regularMarketPrice);
+                    
+                    document.getElementById('prevClose').value = yValue;
+                    document.getElementById('currentPrice').value = zValue;
+                    nameDisplay.innerText = `目前標的：上櫃 ${code} (備用源)`;
+                    statusEl.innerText = `✅ 數據同步成功！(昨收: ${yValue} / 現值: ${zValue})`;
+                    statusEl.className = "text-xs text-green-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden";
+                    calculateAll();
+                } catch(err) {
+                    statusEl.innerText = `❌ 所有連線受限。請直接在格子手動輸入數值。`;
+                    statusEl.className = "text-xs text-red-400 p-3 bg-zinc-900 rounded h-11 flex items-center overflow-hidden";
+                }
+            }
+        }
+
+        // 監聽手動輸入格
+        const inputs = ['units', 'originalCost', 'currentPrice', 'prevClose', 'dayTradeBuy'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', calculateAll);
+        });
+
+        // 支援 Enter 鍵查詢
+        document.getElementById('stockCode').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchStockData();
+            }
+        });
+
+        // 初始化第一次計算
+        window.onload = calculateAll;
+    </script>
+</body>
+</html>
